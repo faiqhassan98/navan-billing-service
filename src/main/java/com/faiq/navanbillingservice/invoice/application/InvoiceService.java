@@ -4,6 +4,7 @@ import com.faiq.navanbillingservice.common.IdGenerator;
 import com.faiq.navanbillingservice.invoice.api.*;
 import com.faiq.navanbillingservice.invoice.persistence.*;
 import com.faiq.navanbillingservice.transaction.api.PageResponse;
+import com.faiq.navanbillingservice.transaction.persistence.TransactionEntity;
 import com.faiq.navanbillingservice.transaction.persistence.TransactionRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -88,7 +89,6 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceResponse patch(String id, CreateInvoiceRequest req) {
-        // Lock the invoice row
         var invoice = invoiceRepo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Invoice not found: " + id));
@@ -99,11 +99,15 @@ public class InvoiceService {
         var transactions = loadTransactionsOrThrow(ids);
         validateSameCurrency(transactions);
 
-        // Wipe old snapshot — cascade deletes lines, tax/fee rollups
+        // Clear existing collections IN PLACE — do not replace the collection
+        // reference or Hibernate loses track of orphan deletion
         invoice.getLines().clear();
         invoice.getTaxRollup().clear();
         invoice.getFeeRollup().clear();
         invoice.setCurrency(transactions.get(0).getCurrency());
+
+        // Flush the clears before adding new rows to avoid constraint conflicts
+        invoiceRepo.saveAndFlush(invoice);
 
         return buildAndSaveInvoice(invoice, transactions);
     }
@@ -115,53 +119,48 @@ public class InvoiceService {
         var invoice = invoiceRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Invoice not found: " + id));
-        // Cascade deletes all snapshot lines and rollups
-        // Does NOT delete the underlying transactions
         invoiceRepo.delete(invoice);
     }
 
     // ── PRIVATE HELPERS ───────────────────────────────────────────────────
 
+    /**
+     * Builds the invoice snapshot by ADDING to existing collections.
+     * Never replaces the collection reference — Hibernate tracks the
+     * original collection instance for orphan deletion.
+     */
     private InvoiceResponse buildAndSaveInvoice(InvoiceEntity invoice,
-                                                 List<com.faiq.navanbillingservice
-                                                         .transaction.persistence
-                                                         .TransactionEntity> transactions) {
-        // Build snapshot lines
-        var lines = new ArrayList<InvoiceLineEntity>();
+                                                 List<TransactionEntity> transactions) {
+        // Add snapshot lines to the existing (possibly cleared) collection
         for (var txn : transactions) {
-            lines.add(invoiceMapper.toSnapshotLine(invoice, txn));
+            invoice.getLines().add(invoiceMapper.toSnapshotLine(invoice, txn));
         }
-        invoice.setLines(lines);
 
-        // Calculate rollups (pure function — no DB)
+        // Calculate rollups — pure function, no DB access
         var rollup = rollupCalculator.calculate(transactions);
 
-        // Build rollup entities
-        var taxRollupEntities = rollup.taxRollup().stream()
+        // Add rollup rows to the existing collections
+        rollup.taxRollup().stream()
                 .map(r -> new InvoiceTaxRollupEntity(invoice, r.name(), r.rate(), r.amount()))
-                .toList();
-        var feeRollupEntities = rollup.feeRollup().stream()
-                .map(r -> new InvoiceFeeRollupEntity(invoice, r.name(), r.amount()))
-                .toList();
-        invoice.setTaxRollup(new ArrayList<>(taxRollupEntities));
-        invoice.setFeeRollup(new ArrayList<>(feeRollupEntities));
+                .forEach(invoice.getTaxRollup()::add);
 
-        // Calculate totals
+        rollup.feeRollup().stream()
+                .map(r -> new InvoiceFeeRollupEntity(invoice, r.name(), r.amount()))
+                .forEach(invoice.getFeeRollup()::add);
+
+        // Sum totals with BigDecimal — never double
         var grandTotal = transactions.stream()
-                .map(t -> t.getTotal())
+                .map(TransactionEntity::getTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         invoice.setTotal(grandTotal);
         invoice.setTaxTotal(rollup.taxTotal());
         invoice.setFeeTotal(rollup.feeTotal());
 
-        var saved = invoiceRepo.save(invoice);
-        return invoiceMapper.toResponse(saved);
+        return invoiceMapper.toResponse(invoiceRepo.save(invoice));
     }
 
-    private List<com.faiq.navanbillingservice.transaction.persistence.TransactionEntity>
-            loadTransactionsOrThrow(List<String> ids) {
-        var transactions = new ArrayList<com.faiq.navanbillingservice
-                .transaction.persistence.TransactionEntity>();
+    private List<TransactionEntity> loadTransactionsOrThrow(List<String> ids) {
+        var transactions = new ArrayList<TransactionEntity>();
         for (var txnId : ids) {
             var txn = transactionRepo.findById(txnId)
                     .orElseThrow(() -> new ResponseStatusException(
@@ -171,11 +170,9 @@ public class InvoiceService {
         return transactions;
     }
 
-    private void validateSameCurrency(
-            List<com.faiq.navanbillingservice.transaction.persistence
-                    .TransactionEntity> transactions) {
+    private void validateSameCurrency(List<TransactionEntity> transactions) {
         var currencies = transactions.stream()
-                .map(t -> t.getCurrency())
+                .map(TransactionEntity::getCurrency)
                 .distinct().toList();
         if (currencies.size() > 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,

@@ -3,7 +3,6 @@ package com.faiq.navanbillingservice.transaction.domain.metadata;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -13,7 +12,7 @@ public record FlightMetadata(
         @NotBlank String origin,
         @NotBlank String destination,
         @NotNull  BigDecimal fare,
-        @NotEmpty @Valid List<Coupon> coupons
+        @Valid List<Coupon> coupons
 ) implements TransactionMetadata {
 
     public record Coupon(
