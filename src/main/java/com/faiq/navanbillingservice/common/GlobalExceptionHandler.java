@@ -5,6 +5,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.faiq.navanbillingservice.transaction.application.DuplicateTransactionException;
 
 import java.net.URI;
 
@@ -28,6 +29,16 @@ public class GlobalExceptionHandler {
         pd.setType(URI.create("urn:navan:bad-request"));
         pd.setTitle("Bad request");
         pd.setDetail(ex.getMessage());
+        return pd;
+    }
+
+    @ExceptionHandler(DuplicateTransactionException.class)
+    public ProblemDetail handleDuplicate(DuplicateTransactionException ex) {
+        var pd = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        pd.setType(URI.create("urn:navan:duplicate-transaction"));
+        pd.setTitle("Duplicate transaction");
+        pd.setDetail(ex.getMessage());
+        pd.setProperty("existing_id", ex.getExistingId());
         return pd;
     }
 }
