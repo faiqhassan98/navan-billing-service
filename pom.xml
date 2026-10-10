@@ -57,6 +57,13 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
+        <!-- JSONB mapping for Postgres -->
+        <dependency>
+            <groupId>io.hypersistence</groupId>
+            <artifactId>hypersistence-utils-hibernate-63</artifactId>
+            <version>3.9.0</version>
+        </dependency>
+
         <!-- ── Observability ── -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
