@@ -6,7 +6,7 @@ CREATE TABLE transactions (
     id            VARCHAR(36)     PRIMARY KEY,
     external_id   VARCHAR(255)    NOT NULL,
     type          VARCHAR(20)     NOT NULL CHECK (type IN ('flight','hotel','rail','navan_fee')),
-    currency      CHAR(3)         NOT NULL,
+    currency      VARCHAR(3)         NOT NULL,
     occurred_at   TIMESTAMPTZ     NOT NULL,
     total         NUMERIC(19,4)   NOT NULL,
     metadata      JSONB           NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE transaction_fee_lines (
 
 CREATE TABLE invoices (
     id          VARCHAR(36)     PRIMARY KEY,
-    currency    CHAR(3)         NOT NULL,
+    currency    VARCHAR(3)         NOT NULL,
     total       NUMERIC(19,4)   NOT NULL,
     tax_total   NUMERIC(19,4)   NOT NULL DEFAULT 0,
     fee_total   NUMERIC(19,4)   NOT NULL DEFAULT 0,
@@ -61,7 +61,7 @@ CREATE TABLE invoice_lines (
                     REFERENCES transactions(id),   -- RESTRICT by default: blocks txn delete if invoiced
     external_id     VARCHAR(255)    NOT NULL,
     type            VARCHAR(20)     NOT NULL,
-    currency        CHAR(3)         NOT NULL,
+    currency        VARCHAR(3)         NOT NULL,
     occurred_at     TIMESTAMPTZ     NOT NULL,
     total           NUMERIC(19,4)   NOT NULL,
     metadata        JSONB           NOT NULL     -- frozen copy

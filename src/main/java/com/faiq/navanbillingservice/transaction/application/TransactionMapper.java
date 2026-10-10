@@ -1,6 +1,7 @@
 package com.faiq.navanbillingservice.transaction.application;
 
 import com.faiq.navanbillingservice.transaction.api.*;
+import com.faiq.navanbillingservice.transaction.domain.TransactionType;
 import com.faiq.navanbillingservice.transaction.persistence.*;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ public class TransactionMapper {
         return new TransactionResponse(
                 e.getId(),
                 e.getExternalId(),
-                e.getType(),
+                TransactionType.fromValue(e.getType()),
                 e.getCurrency(),
                 e.getOccurredAt(),
                 e.getTotal(),

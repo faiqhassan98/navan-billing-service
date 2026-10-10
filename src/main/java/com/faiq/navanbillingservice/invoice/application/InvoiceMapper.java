@@ -57,7 +57,7 @@ public class InvoiceMapper {
         line.setInvoice(invoice);
         line.setTransactionId(txn.getId());
         line.setExternalId(txn.getExternalId());
-        line.setType(txn.getType().getValue());
+        line.setType(txn.getType());
         line.setCurrency(txn.getCurrency());
         line.setOccurredAt(txn.getOccurredAt());
         line.setTotal(txn.getTotal());

@@ -77,7 +77,7 @@ public class TransactionService {
         var entity = new TransactionEntity();
         entity.setId(IdGenerator.transactionId());
         entity.setExternalId(req.externalId());
-        entity.setType(type);
+        entity.setType(type.getValue());
         entity.setCurrency(req.currency().toUpperCase());
         entity.setOccurredAt(req.occurredAt());
         entity.setTotal(req.total());
@@ -146,7 +146,7 @@ public class TransactionService {
         if (req.occurredAt() != null) entity.setOccurredAt(req.occurredAt());
 
         if (req.metadata() != null) {
-            var type          = entity.getType();
+            var type          = TransactionType.fromValue(entity.getType());
             var typedMetadata = metadataMapper.parse(type, req.metadata());
             entity.setMetadata(metadataMapper.toMap(typedMetadata));
         }
